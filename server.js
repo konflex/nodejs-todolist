@@ -1,3 +1,9 @@
+/**
+ * @file server.js
+ * @summary The server main component
+ * @module Server
+ */
+
 const express = require('express')
 const cors = require('cors')
 require('dotenv').config()
