@@ -24,6 +24,8 @@ app.use(express.urlencoded({ extended: true }))
 
 const db = require("./api/models")
 
+console.log('hello world')
+
 db.mongoose
 	.connect(process.env.MONGODBKEY, {
 		useNewUrlParser: true,
