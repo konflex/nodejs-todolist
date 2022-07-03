@@ -1,3 +1,9 @@
+/**
+ * @file api/models/index.js
+ * @summary Main models component
+ * @module Server
+ */
+
 const mongoose = require("mongoose")
 mongoose.Promise = global.Promise
 

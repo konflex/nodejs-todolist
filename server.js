@@ -5,16 +5,14 @@
  */
 
 const express = require('express')
-const cors = require('cors')
 require('dotenv').config()
+const corsMiddleware = require("./corsMiddleware")
 const app = express()
 
-var corsOptions = {
-	origin: "http://localhost:8080",
-	credentials: true, 
-	};
+// preflight
+app.options("*", corsMiddleware)
 
-app.use(cors(corsOptions))
+app.use(corsMiddleware)
 
 // add middleware before routes
 app.use(express.json())
@@ -23,8 +21,6 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 const db = require("./api/models")
-
-console.log('hello world')
 
 db.mongoose
 	.connect(process.env.MONGODBKEY, {
@@ -38,8 +34,6 @@ db.mongoose
 		console.error("Connection error", err)
 		process.exit()
 	})
-
-
 
 
 app.get('/', (req,res) => {
@@ -71,8 +65,8 @@ app.listen(PORT, () => {
        |     ||     |/  /  |    \ |    _]|  |  ||  D  |        
        |  O  ||  _  /   \_ |     ||   [_ |  |  ||     |        
        |     ||  |  \     ||  .  ||     ||  |  ||     |        
-       |_____||__|__|\____||__|\_||_____||__|__||_____|        
-														
+       |_____||__|__|\____||__|\_||_____||__|__||_____|    
+    													
 ===============================================================
 	`)
 })

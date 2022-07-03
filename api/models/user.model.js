@@ -1,3 +1,9 @@
+/**
+ * @file api/models/user.model.js
+ * @summary User model component
+ * @module Server
+ */
+
 const mongoose = require("mongoose")
 
 const User = mongoose.model(

@@ -1,3 +1,9 @@
+/**
+ * @file api/routes/task.routes.js
+ * @summary Task routes component
+ * @module Server
+ */
+
 const { authJwt } = require("../middlewares")
 const controller = require("../controllers/task.controller")
 
@@ -12,14 +18,14 @@ module.exports = function(app) {
 
 	// app.get("/api/checkAuth",	[authJwt.verifyToken],controller.checkAuth)
 
-	app.get("/api/tasks",		[authJwt.verifyToken],controller.allTasks)
+	app.get("/api/tasks",		[authJwt.verifyToken],	controller.allTasks)
 
-	app.delete("/api/tasks",	[authJwt.verifyToken],controller.deleteManyTasks)
+	app.delete("/api/tasks",	[authJwt.verifyToken],	controller.deleteManyTasks)
 
-	app.post("/api/task",		[authJwt.verifyToken], controller.postTask)
+	app.post("/api/task",		[authJwt.verifyToken], 	controller.postTask)
 
-	app.delete("/api/task",		[authJwt.verifyToken], controller.deleteTask)
+	app.delete("/api/task",		[authJwt.verifyToken], 	controller.deleteTask)
 
-	app.put("/api/task",		[authJwt.verifyToken], controller.updateTask)
+	app.put("/api/task",		[authJwt.verifyToken], 	controller.updateTask)
 
 }

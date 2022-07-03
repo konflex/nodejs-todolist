@@ -1,3 +1,9 @@
+/**
+ * @file api/controllers/auth.controller.js
+ * @summary Auth controller component
+ * @module Server
+*/
+
 const db = require("../models")
 const User = db.user
 
@@ -31,6 +37,7 @@ exports.signin = (req, res) => {
 		email: req.body.email
 	})
 		.exec(async (err, user) => {
+			
 			if(err) {
 				res.status(500).send({ message: err })
 				return
@@ -64,7 +71,7 @@ exports.signin = (req, res) => {
 			let refreshToken = await RefreshToken.createToken(user)
 
 			res.cookie('myToken', token, {
-				// expires: new Date(Date.now() + process.env.TOKEN_EXPIRATION*1000) ,
+				// expires: new Date(Date.now() + process.env.TOKEN_EXPIRATION*1000),
 				secure: false,
 				httpOnly: true,
 			})

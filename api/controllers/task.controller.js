@@ -1,3 +1,9 @@
+/**
+ * @file api/controllers/task.controller.js
+ * @summary Task controller component
+ * @module Server
+ */
+
 const db = require("../models")
 const Task = db.task
 
