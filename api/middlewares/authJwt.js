@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken")
 require('dotenv').config()
 
-const { TokenExpiredError } = jwt;
+const { TokenExpiredError, } = jwt;
 
 const catchError = (err, res) => {
   if (err instanceof TokenExpiredError) {
@@ -12,17 +12,22 @@ const catchError = (err, res) => {
 }
 
 const verifyToken = (req, res, next) => {
+
 	let cookie = req.headers["cookie"]
 	
 	let getCookie = new URLSearchParams(cookie)
 
 	const token = getCookie.get('myToken')
 
+
 	if(!token) {
-		return res.status(403).send({ message: "No token provided", isAuthenticated: false})
+		return res.status(403).send({ message: "No token provided", isAuthenticated: false, })
 	}
 
-	jwt.verify(token, process.env.SECRET_KEY, (err, decoded) => {
+
+	const accessToken = JSON.parse(token).accessToken
+
+	jwt.verify(accessToken, process.env.SECRET_KEY, (err, decoded) => {
 		if(err) {
 			return catchError(err,res)
 		}

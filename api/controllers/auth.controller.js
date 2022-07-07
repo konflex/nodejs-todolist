@@ -38,14 +38,18 @@ exports.signin = (req, res) => {
 	})
 		.exec(async (err, user) => {
 			
+
+
 			if(err) {
 				res.status(500).send({ message: err })
 				return
 			}
 
-			if(!user){
-				return res.status(401).send({ message: "Invalid email or password"})
 
+
+			if(!user){
+				res.status(401).send({ message: "Invalid email or password"})
+				return 
 			} 
 
 			var passwordIsValid = bcrypt.compareSync(
@@ -53,35 +57,55 @@ exports.signin = (req, res) => {
 				user.password
 			)
 
+
+
 			if(!passwordIsValid) {
-				return res.status(401).send({
+				res.status(401).send({
 					message: "Invalid email or password",
 				})
+
+				return 
 			}
 
-			 
-
-			var token = jwt.sign({ 
+			let token = jwt.sign({ 
 				id: user.id,  
 				exp: Math.floor(Date.now() / 1000) + parseInt(process.env.TOKEN_EXPIRATION),
 			}, 
 				process.env.SECRET_KEY
 			)
 			
-			let refreshToken = await RefreshToken.createToken(user)
 
-			res.cookie('myToken', token, {
+			let refreshTokenObj = await RefreshToken.findOne({ user: user })
+			
+			let cookies = {
+				accessToken: undefined,
+				refreshToken: undefined,
+			}
+
+			if(!refreshTokenObj) {
+				refreshTokenObj = await RefreshToken.createToken(user)
+
+				cookies.refreshToken = refreshTokenObj.refreshToken.token
+				cookies.accessToken = token
+			}
+			else {
+				cookies.refreshToken = refreshTokenObj.token
+				cookies.accessToken = token
+			}
+
+			res.status(200)
+			.cookie('myToken', JSON.stringify(cookies), {
 				// expires: new Date(Date.now() + process.env.TOKEN_EXPIRATION*1000),
 				secure: false,
 				httpOnly: true,
 			})
+			
 
-			res.status(200).send({
+			.send({
 				id: user._id,
 				username: user.username,
 				email: user.email,
 				isAuthenticated: true,
-				refreshToken: refreshToken
 			})
 
 		})
@@ -89,39 +113,71 @@ exports.signin = (req, res) => {
 
 exports.refreshToken = async (req, res) => {
 
-	const { refreshToken: requestToken } = req.body
+	let cookie = req.headers["cookie"]
+	let getCookie = new URLSearchParams(cookie)
+	const myToken = getCookie.get('myToken')
+
+	// get the object containing accessToken and refreshToken 
+	const tokenObject = JSON.parse(myToken)
+
+	const requestToken = tokenObject.refreshToken
+
 
 	if(requestToken == null) {
-		return res.status(403).json({ message: "Refresh token is required"})
+		return res.status(403).json({ message: "Refresh token is required", })
+		 
 	} 
 
 	try {
+
 		let refreshToken = await RefreshToken.findOne({ token: requestToken })
 
 		if(!refreshToken) {
-			res.status(403).json({ message: "Refresh token is not in the database"})
+
+			res.status(403).json({ message: "Refresh token is not in the database. \
+			Please make a new signin request", })
+			
 			return
 		}
 
 		if(RefreshToken.verifyExpiration(refreshToken)) {
-			RefreshToken.findByIdAndRemove(refreshToken._id, { useFindAndRemove: false}).exec()
+			RefreshToken.findByIdAndRemove(refreshToken._id.valueOf(), { useFindAndRemove: false, }).exec()
 
 			res.status(403).json({
-				message: "Refresh token was expired. Please make a new signin request"
+					message: "Refresh token was expired. Please make a new signin request",
 			})
-			return
+
+			return 
 		}
 
-		let newAccessToken = jwt.sign({ id: refreshToken.user._id}, process.env.SECRET_KEY, {
-			expiresIn: process.env.TOKEN_EXPIRATION 
+
+		let newAccessToken = jwt.sign({ 
+			id: refreshToken.user.valueOf(), 
+			exp: Math.floor(Date.now() / 1000) + parseInt(process.env.TOKEN_EXPIRATION), }, 
+			process.env.SECRET_KEY
+		)
+
+
+		tokenObject.accessToken = newAccessToken
+		
+		const stgToken = JSON.stringify(tokenObject)
+
+		return res.status(200)
+		
+		// set the cookie with the new token
+		.cookie('myToken', stgToken, {
+			secure: false,
+			httpOnly: true,
 		})
 
-		return res.status(200).json({
-			accessToken: newAccessToken,
-			refreshToken: refreshToken.token
+
+		.send({
+			message: "New token has been created",
 		})
 	}
+
+
 	catch(err) {
-		return res.status(500).send({ message: err })
+		return res.status(500).send({ message: err, })
 	}
 }

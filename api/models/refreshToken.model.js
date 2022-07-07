@@ -17,16 +17,17 @@ RefreshTokenSchema.statics.createToken = async function(user) {
 	expiredAt.setSeconds(
 		expiredAt.getSeconds() + process.env.EXPIRATION_REFRESH_TOKEN // expiredRefreshToken in seconds
 	)
+	
 
 	let _token = uuidv4()
 	
 	let _object = new this({
 		token: _token,
 		user: user.id,
-		expiredAt: expiredAt.getTime()
+		expiryDate: expiredAt.getTime()
 	})
 
-	// console.log(_object)
+	// console.log("_object",_object)
 
 	let refreshToken = await _object.save()
 
@@ -35,6 +36,7 @@ RefreshTokenSchema.statics.createToken = async function(user) {
 }
 
 RefreshTokenSchema.statics.verifyExpiration = (token) => {
+
 	return token.expiryDate.getTime() < new Date().getTime()
 }
 
