@@ -10,7 +10,7 @@ const corsMiddleware = require("./corsMiddleware")
 const app = express()
 
 // preflight
-app.options("*", corsMiddleware)
+//app.options("*", corsMiddleware)
 
 app.use(corsMiddleware)
 
