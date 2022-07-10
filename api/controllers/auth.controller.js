@@ -120,8 +120,10 @@ exports.refreshToken = async (req, res) => {
 	// get the object containing accessToken and refreshToken 
 	const tokenObject = JSON.parse(myToken)
 
-	const requestToken = tokenObject.refreshToken
-
+	let requestToken 
+	
+	if(tokenObject && typeof tokenObject === 'object') requestToken = tokenObject.refreshToken
+	else requestToken = null
 
 	if(requestToken == null) {
 		return res.status(403).json({ message: "Refresh token is required", })
