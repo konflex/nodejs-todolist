@@ -12,6 +12,8 @@ const app = express()
 // preflight
 //app.options("*", corsMiddleware)
 
+app.set('trust proxy', 1)
+
 app.use(corsMiddleware)
 
 // add middleware before routes
