@@ -96,7 +96,7 @@ exports.signin = (req, res) => {
 			res.status(200)
 			.cookie('myToken', JSON.stringify(cookies), {
 				// expires: new Date(Date.now() + process.env.TOKEN_EXPIRATION*1000),
-				secure: false,
+				secure: true,
 				httpOnly: true,
 			})
 			
