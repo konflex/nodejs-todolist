@@ -74,12 +74,9 @@ exports.signin = (req, res) => {
 				process.env.SECRET_KEY
 			)
 			
-			console.log(token, 'this is the sign token at line 70')
 
 			let refreshTokenObj = await RefreshToken.findOne({ user: user })
 			
-			console.log(refreshTokenObj, 'this is the refreshTokenObj at line 79')
-
 			let cookies = {
 				accessToken: undefined,
 				refreshToken: undefined,
@@ -96,13 +93,10 @@ exports.signin = (req, res) => {
 				cookies.accessToken = token
 			}
 
-
-			console.log(cookies, 'cookies to will be place in client')
-
-			
 			res.status(200)
 			.cookie('myToken', JSON.stringify(cookies), {
 				// expires: new Date(Date.now() + process.env.TOKEN_EXPIRATION*1000),
+				sameSite: "none",
 				secure: true,
 				httpOnly: true,
 			})
@@ -123,6 +117,7 @@ exports.refreshToken = async (req, res) => {
 	let cookie = req.headers["cookie"]
 	let getCookie = new URLSearchParams(cookie)
 	const myToken = getCookie.get('myToken')
+
 
 	// get the object containing accessToken and refreshToken 
 	const tokenObject = JSON.parse(myToken)
