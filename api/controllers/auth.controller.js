@@ -95,9 +95,8 @@ exports.signin = (req, res) => {
 
 			res.status(200)
 			.cookie('myToken', JSON.stringify(cookies), {
-				// expires: new Date(Date.now() + process.env.TOKEN_EXPIRATION*1000),
-				sameSite: "none",
-				secure: true,
+				sameSite: process.env.NODE_ENV == "production" ? "none" : "lax",
+				secure: process.env.NODE_ENV == "production" ? true : false,
 				httpOnly: true,
 			})
 			
@@ -170,10 +169,10 @@ exports.refreshToken = async (req, res) => {
 		
 		// set the cookie with the new token
 		.cookie('myToken', stgToken, {
-			secure: true,
+			sameSite: process.env.NODE_ENV == "production" ? "none" : "lax",
+			secure: process.env.NODE_ENV == "production" ? true : false,
 			httpOnly: true,
 		})
-
 
 		.send({
 			message: "New token has been created",

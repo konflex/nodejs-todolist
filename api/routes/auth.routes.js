@@ -15,7 +15,7 @@ module.exports = function(app) {
 			"x-access-token, Origin, Content-Type, Accept"
 		)
 		res.header("Access-Control-Allow-Credentials", true)
-		res.header("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE")
+		res.header("Access-Control-Allow-Methods", "GET,POST")
 		next()
 	})
 
