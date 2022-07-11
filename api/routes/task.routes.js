@@ -13,6 +13,7 @@ module.exports = function(app) {
 			"Access-Control-Allow-Headers",
 			"x-access-token, Origin, Content-Type, Accept"
 		)
+		res.header('Access-Control-Allow-Credentials', true)
 		next()
 	})
 
