@@ -117,6 +117,10 @@ exports.refreshToken = async (req, res) => {
 	let getCookie = new URLSearchParams(cookie)
 	const myToken = getCookie.get('myToken')
 
+
+	console.log('i poped bitch')
+
+	
 	// get the object containing accessToken and refreshToken 
 	const tokenObject = JSON.parse(myToken)
 
@@ -168,7 +172,7 @@ exports.refreshToken = async (req, res) => {
 		
 		// set the cookie with the new token
 		.cookie('myToken', stgToken, {
-			secure: false,
+			secure: true,
 			httpOnly: true,
 		})
 
