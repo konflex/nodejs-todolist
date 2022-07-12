@@ -98,7 +98,7 @@ exports.signin = (req, res) => {
 				sameSite: process.env. NODE_ENV == "production" ? "lax" : "none",
 				secure: process.env.NODE_ENV == "production" ? true : false,
 				httpOnly: true,
-				domain: process.env.DEPLOY_URL
+				domain: process.env.DOMAIN
 			})
 			
 
@@ -173,7 +173,7 @@ exports.refreshToken = async (req, res) => {
 			sameSite: process.env. NODE_ENV == "production" ? "lax" : "none",
 			secure: process.env.NODE_ENV == "production" ? true : false,
 			httpOnly: true,
-			domain: process.env.DEPLOY_URL
+			domain: process.env.DOMAIN
 		})
 
 		.send({
