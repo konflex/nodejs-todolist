@@ -7,16 +7,16 @@
 const cors = require('cors')
 require('dotenv').config()
 
-let corsUrl
+let allowedDomains
 
 if (process.env.NODE_ENV === 'development') {
-  corsUrl = process.env.LOCAL_URL
+  allowedDomains = process.env.LOCAL_URL
 } else if (process.env.NODE_ENV === 'production') {
-  corsUrl = process.env.DEPLOY_URL
+  allowedDomains = JSON.parse(process.env.DEPLOY_URL)
 }
 
 const corsOptions = {
-    origin: corsUrl,
+    origin: allowedDomains,
     credentials: true, // important 
 }
 
