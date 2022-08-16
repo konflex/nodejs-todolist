@@ -13,11 +13,7 @@ if (process.env.NODE_ENV === 'development') {
   allowedDomains = process.env.LOCAL_URL
 } else if (process.env.NODE_ENV === 'production') {
 
-
   allowedDomains = JSON.parse(process.env.DEPLOY_URL)
-
-  console.log(allowedDomains)
-
 
 }
 
