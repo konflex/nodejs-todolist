@@ -18,7 +18,6 @@ RefreshTokenSchema.statics.createToken = async function(user) {
 		expiredAt.getSeconds() + process.env.EXPIRATION_REFRESH_TOKEN // expiredRefreshToken in seconds
 	)
 	
-
 	let _token = uuidv4()
 	
 	let _object = new this({
@@ -26,8 +25,6 @@ RefreshTokenSchema.statics.createToken = async function(user) {
 		user: user.id,
 		expiryDate: expiredAt.getTime()
 	})
-
-	// console.log("_object",_object)
 
 	let refreshToken = await _object.save()
 
@@ -37,7 +34,10 @@ RefreshTokenSchema.statics.createToken = async function(user) {
 
 RefreshTokenSchema.statics.verifyExpiration = (token) => {
 
-	return token.expiryDate.getTime() < new Date().getTime()
+	let expiryDate = token.expiryDate.getTime() 
+	let actualDate = new Date().getTime()
+
+	return expiryDate < actualDate
 }
 
 const RefreshToken = mongoose.model('RefreshToken', RefreshTokenSchema)

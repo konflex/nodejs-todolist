@@ -76,7 +76,7 @@ exports.signin = (req, res) => {
 			
 
 			let refreshTokenObj = await RefreshToken.findOne({ user: user })
-			
+
 			let cookies = {
 				accessToken: undefined,
 				refreshToken: undefined,
@@ -85,11 +85,11 @@ exports.signin = (req, res) => {
 			if(!refreshTokenObj) {
 				refreshTokenObj = await RefreshToken.createToken(user)
 
-				cookies.refreshToken = refreshTokenObj.refreshToken.token
+				cookies.refreshToken = refreshTokenObj?.refreshToken?.token
 				cookies.accessToken = token
 			}
 			else {
-				cookies.refreshToken = refreshTokenObj.token
+				cookies.refreshToken = refreshTokenObj?.token
 				cookies.accessToken = token
 			}
 
@@ -144,7 +144,9 @@ exports.refreshToken = async (req, res) => {
 			return
 		}
 
-		if(RefreshToken.verifyExpiration(refreshToken)) {
+		let verifyExpiration = await RefreshToken.verifyExpiration(refreshToken)
+
+		if(verifyExpiration) {
 			RefreshToken.findByIdAndRemove(refreshToken._id.valueOf(), { useFindAndRemove: false, }).exec()
 
 			res.status(403).json({
@@ -181,8 +183,8 @@ exports.refreshToken = async (req, res) => {
 		})
 	}
 
-
 	catch(err) {
+	
 		return res.status(500).send({ message: err, })
 	}
 }
