@@ -1,10 +1,11 @@
 const db = require("../models")
 const User = db.user
 
-checkDuplicateUsernameOrEmail = (req, res, next) => {
-	// Username
+checkDuplicateEmail = (req, res, next) => {
+
+	//Email
 	User.findOne({
-		username: req.body.username
+		email: req.body.email
 	}).exec((err, user) => {
 		if(err) {
 			res.status(500).send({ message: err })
@@ -12,32 +13,17 @@ checkDuplicateUsernameOrEmail = (req, res, next) => {
 		}
 
 		if(user) {
-			res.status(400).send({ message: "Username is already taken"})
-			return 
+			res.status(400).send({ message: "Email is already taken"})
+			return
 		}
-
-		//Email
-		User.findOne({
-			email: req.body.email
-		}).exec((err, user) => {
-			if(err) {
-				res.status(500).send({ message: err })
-				return
-			}
-	
-			if(user) {
-				res.status(400).send({ message: "Email is already taken"})
-				return
-			}
-			
-			next()
-		})
-
+		
+		next()
 	})
+
 }
 
 const verifySignUp = {
-	checkDuplicateUsernameOrEmail,
+	checkDuplicateEmail,
 }
 
 module.exports = verifySignUp

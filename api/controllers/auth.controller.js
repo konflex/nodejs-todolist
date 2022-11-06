@@ -16,7 +16,6 @@ const RefreshToken = require("../models/refreshToken.model")
 
 exports.signup = (req, res) => {
 	const user = new User({
-		username: req.body.username,
 		email: req.body.email,
 		password: bcrypt.hashSync(req.body.password,10)
 	})
@@ -85,12 +84,17 @@ exports.signin = (req, res) => {
 			if(!refreshTokenObj) {
 				refreshTokenObj = await RefreshToken.createToken(user)
 
-				cookies.refreshToken = refreshTokenObj?.refreshToken?.token
-				cookies.accessToken = token
+				if(refreshTokenObj && refreshTokenObj.refreshToken) {
+					cookies.refreshToken = refreshTokenObj.refreshToken.token
+					cookies.accessToken = token
+				}
 			}
 			else {
-				cookies.refreshToken = refreshTokenObj?.token
-				cookies.accessToken = token
+
+				if(refreshTokenObj) {
+					cookies.refreshToken = refreshTokenObj.token
+					cookies.accessToken = token
+				}
 			}
 
 			res.status(200)
@@ -104,7 +108,6 @@ exports.signin = (req, res) => {
 
 			.send({
 				id: user._id,
-				username: user.username,
 				email: user.email,
 				isAuthenticated: true,
 			})
