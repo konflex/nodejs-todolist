@@ -28,7 +28,7 @@ function sendConfirmationEmail(user, encodedToken, res, endpoint) {
 	})
 
 	const node_env = process.env.NODE_ENV
-	const host = node_env == 'development' ? process.env.HOST_DEV_FRONT : HOST_PROD_FRONT
+	const host = node_env == 'development' ? process.env.HOST_DEV_FRONT : process.env.HOST_PROD_FRONT
 	const link = host + endpoint + encodeURIComponent(encodedToken)
 
 	const mailOptions = {
