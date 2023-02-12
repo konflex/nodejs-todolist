@@ -7,7 +7,6 @@
 const db = require("../models")
 const Task = db.task
 
-const jwt = require("jsonwebtoken")
 require('dotenv').config()
 
 exports.postTask = (req, res) => {

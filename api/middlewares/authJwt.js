@@ -26,7 +26,7 @@ const verifyToken = (req, res, next) => {
 
 
 	const accessToken = JSON.parse(token).accessToken
-
+	
 	jwt.verify(accessToken, process.env.SECRET_KEY, (err, decoded) => {
 		if(err) {
 			return catchError(err,res)

@@ -14,5 +14,7 @@ db.mongoose = mongoose
 db.user = require("./user.model")
 db.task = require("./task.model")
 db.refreshToken = require("./refreshToken.model")
+db.emailToken = require("./emailToken.model")
+db.passwordToken = require("./passwordToken.model")
 
 module.exports = db

@@ -29,5 +29,13 @@ module.exports = function(app) {
 	app.post("/api/auth/signin",controller.signin)
 
 	app.get("/api/auth/refreshtoken", controller.refreshToken)
-	
+
+	app.get("/api/verify/:token",controller.confirmEmail)
+
+	app.post("/api/verify/resendlink",controller.resendLink)
+
+	app.post("/api/resetpassword",controller.sendResetPasswordLink)
+
+	app.put("/api/resetpassword/:token",controller.resetPassword)
+
 }
