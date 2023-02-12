@@ -8,6 +8,7 @@ const mongoose = require("mongoose")
 
 const halfAnHour = 30 * 60
 
+// Mongoose schema
 const emailTokenSchema = new mongoose.Schema({
 	user: {
 		type: mongoose.Schema.Types.ObjectId,
