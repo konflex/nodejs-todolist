@@ -18,7 +18,7 @@ var jwt = require("jsonwebtoken")
 var bcrypt = require("bcryptjs")
 
 
-function sendConfirmationEmail(user, encodedToken, res, endpoint) {
+function sendConfirmationEmail(user, encodedToken, res, endpoint, headerMessage) {
 
 	// Send email
 	const transporter = nodemailer.createTransport({ 
@@ -35,7 +35,7 @@ function sendConfirmationEmail(user, encodedToken, res, endpoint) {
 		from: process.env.EMAIL_USERNAME, 
 		to: user.email, 
 		subject: "Account Verification Link", 
-		text: "Hello,\n\n" + "Please verify your account by clicking the link: \n" + 
+		text: headerMessage + 
 		link + 
 		"\n\nThank You!\n" 
 	}
@@ -86,8 +86,9 @@ exports.signup = (req, res) => {
 				}
 
 				const endpoint = "/verify?token="
+				const headerMessage = "Hello,\n\n" + "Please verify your account by clicking the link: \n"
 
-				sendConfirmationEmail(user, encodedToken, res, endpoint)
+				sendConfirmationEmail(user, encodedToken, res, endpoint, headerMessage)
 
 			})
 
@@ -210,7 +211,9 @@ exports.resendLink = function (req, res) {
 							const endpoint = "/verify?token="
 
 							// emailToken updated and new email sent to user
-							sendConfirmationEmail(user, encodedToken, res, endpoint)
+							const headerMessage = "Hello,\n\n" + "Please verify your account by clicking the link: \n"
+
+							sendConfirmationEmail(user, encodedToken, res, endpoint, headerMessage)
 
 						})
 
@@ -235,8 +238,9 @@ exports.resendLink = function (req, res) {
 							const endpoint = "/verify?token="
 
 							// emailToken updated and new email sent to user
-							sendConfirmationEmail(user, encodedToken, res, endpoint)
+							const headerMessage = "Hello,\n\n" + "Please verify your account by clicking the link: \n"
 
+							sendConfirmationEmail(user, encodedToken, res, endpoint, headerMessage)
 						})
 
 						// Successfully create user in db, email sent, waiting for user email confirmation
@@ -295,8 +299,9 @@ exports.sendResetPasswordLink = function (req, res) {
 					const endpoint = "/resetpassword?token="
 
 					// passwordToken updated and new email sent to user
-					sendConfirmationEmail(user, encodedToken, res, endpoint)
+					const headerMessage = "Hello,\n\n" + "Click on this link to reset your password: \n"
 
+					sendConfirmationEmail(user, encodedToken, res, endpoint, headerMessage)
 				})
 
 				// Successfully create user in db, email sent, waiting for user email confirmation
