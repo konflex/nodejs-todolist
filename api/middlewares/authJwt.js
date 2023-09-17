@@ -5,35 +5,33 @@ const { TokenExpiredError, } = jwt;
 
 const catchError = (err, res) => {
   if (err instanceof TokenExpiredError) {
-    return res.status(401).send({ message: "Unauthorized! Access Token was expired!" });
+	res.status(401).json({ message: "Unauthorized! Access Token was expired!" })
   }
-
-  return res.sendStatus(401).send({ message: "Unauthorized!" });
+  else {
+	res.sendStatus(401).json({ message: "Unauthorized!" })
+  }
 }
 
 const verifyToken = (req, res, next) => {
 
 	let cookie = req.headers["cookie"]
-	
 	let getCookie = new URLSearchParams(cookie)
-
 	const token = getCookie.get('myToken')
 
-
 	if(!token) {
-		return res.status(403).send({ message: "No token provided", isAuthenticated: false, })
+		res.status(403).json({ message: "No token provided", isAuthenticated: false, })
+		return 
 	}
-
 
 	const accessToken = JSON.parse(token).accessToken
 	
 	jwt.verify(accessToken, process.env.SECRET_KEY, (err, decoded) => {
 		if(err) {
-			return catchError(err,res)
+			catchError(err,res)
+			return 
 		}
 
 		req.userId = decoded.id
-
 		next()
 	})
 }

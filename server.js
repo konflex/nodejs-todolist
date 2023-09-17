@@ -22,6 +22,9 @@ app.use(express.urlencoded({ extended: true }))
 
 const db = require("./api/models")
 
+// Only schema format will be saved, preparing mongoose v7
+db.mongoose.set('strictQuery', true)
+
 db.mongoose
 	.connect(process.env.MONGODBKEY, {
 		useNewUrlParser: true,

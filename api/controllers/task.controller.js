@@ -19,12 +19,12 @@ exports.postTask = (req, res) => {
 
 	task.save((err, task) => {
 		if(err) {
-			res.status(500).send({ message: err })
+			res.status(500).json({ message: err })
 			return
 		}
 
-		res.status(200).send({ message: "Task was recorded successfully"})
-	
+		res.status(200).json({ message: "Task was recorded successfully"})
+		return
 	})
 }
 
@@ -35,18 +35,18 @@ exports.allTasks = (req, res) => {
 	})
 		.exec((err, tasks) => {
 			if(err) {
-				res.status(500).send({ message: err })
+				res.status(500).json({ message: err })
 				return
 			}
 
 			if(!tasks){
-				return res.status(200).send([])
-
+				res.status(200).json([])
+				return 
 			} 
 
-			res.status(200).send(tasks)
+			res.status(200).json(tasks)
+			return
 		})
-
 }
 
 exports.deleteManyTasks = (req, res) => {
@@ -56,7 +56,7 @@ exports.deleteManyTasks = (req, res) => {
 	res.send({ 
 		message: "All todos deleted successfully", 
 	})
-
+	return
 }
 
 exports.deleteTask = (req, res) => {
@@ -65,11 +65,11 @@ exports.deleteTask = (req, res) => {
 		_id: req.body.id
 	}, function(err, task) {
 		if(!err && task) {
-			res.status(200).send({message: "Task successfully deleted" })
+			res.status(200).json({message: "Task successfully deleted" })
 			return 
 		}
 		else {
-			res.status(500).send({ message: err })
+			res.status(500).json({ message: err })
 			return
 		}
 	})
@@ -84,15 +84,16 @@ exports.updateTask = (req, res) => {
 		task: req.body.task,
 		achievement: req.body.achievement }, { new: true }, function(err, task){
 		if(err) {
-			res.status(500).send({ message: err })
+			res.status(500).json({ message: err })
 			return
 		}
 		else if(!err && !task) {
-			res.status(200).send({ message: "No task was found"})
+			res.status(200).json({ message: "No task was found"})
+			return
 		}
 		else {
-			res.status(200).send({ message: "Task successfully updated"})
+			res.status(200).json({ message: "Task successfully updated"})
+			return
 		}
 	})
-
 }

@@ -18,34 +18,52 @@ var jwt = require("jsonwebtoken")
 var bcrypt = require("bcryptjs")
 
 
-function sendConfirmationEmail(user, encodedToken, res, endpoint, headerMessage) {
+/**
+ * 
+ * @param {*} user 
+ * @param {*} encodedToken 
+ * @param {*} res 
+ * @param {*} endpoint 
+ * @param {*} headerMessage 
+ * @returns 
+ */
+function sendConfirmationEmail(user, encodedToken, endpoint, headerMessage) {
 
-	// Send email
-	const transporter = nodemailer.createTransport({ 
-		host: "smtpout.secureserver.net",  
-		port: 587,
-		auth: { user: process.env.EMAIL_USERNAME, pass: process.env.EMAIL_PASSWORD },
-	})
+	try{
 
-	const node_env = process.env.NODE_ENV
-	const host = node_env == 'development' ? process.env.HOST_DEV_FRONT : process.env.HOST_PROD_FRONT
-	const link = host + endpoint + encodeURIComponent(encodedToken)
+		// Send email
+		const transporter = nodemailer.createTransport({ 
+			host: "smtpout.secureserver.net",  
+			port: 587,
+			auth: { user: process.env.EMAIL_USERNAME, pass: process.env.EMAIL_PASSWORD },
+		})
 
-	const mailOptions = {
-		from: process.env.EMAIL_USERNAME, 
-		to: user.email, 
-		subject: "Account Verification Link", 
-		text: headerMessage + 
-		link + 
-		"\n\nThank You!\n" 
-	}
+		const node_env = process.env.NODE_ENV
+		const host = node_env == 'development' ? process.env.HOST_DEV_FRONT : process.env.HOST_PROD_FRONT
+		const link = host + endpoint + encodeURIComponent(encodedToken)
 
-	transporter.sendMail(mailOptions, function (err) {
-		// Error occured
-		if (err) { 
-			return res.status(500).send({ message: "Error occured, cannot proceed" })
+		const mailOptions = {
+			from: process.env.EMAIL_USERNAME, 
+			to: user.email, 
+			subject: "Account Verification Link", 
+			text: headerMessage + 
+			link + 
+			"\n\nThank You!\n" 
 		}
-	})
+
+		transporter.sendMail(mailOptions, function (err) {
+			// Error occured
+			if (err) { 
+				return false
+			}
+			else {
+				return true
+			}
+		})
+	}
+	catch(err) {
+		return false
+	}
 }
 
 exports.signup = (req, res) => {
@@ -53,19 +71,20 @@ exports.signup = (req, res) => {
 	try {
 
 		const user = new User({
-			email: req.body.email,
-			password: bcrypt.hashSync(req.body.password,10)
+				email: req.body.email,
+				password: bcrypt.hashSync(req.body.password,10)
 		})
 
 		user.save((err, user) => {
 			// Error occured
 			if(err) {
-				return res.status(500).send({ message: "Error occured, cannot proceed" })
+				res.status(500).json({ message: "Error occured, cannot proceed" })
+				return 
 			}
 
 			const token = bcrypt.genSaltSync(10)
 
-			// generate token model and save
+			// Generate token model and save
 			const emailToken = new EmailToken({
 				user:user._id.toHexString(),
 				token: token,
@@ -80,25 +99,29 @@ exports.signup = (req, res) => {
 			)
 
 			emailToken.save((err) => {
-				// Error occured
-				if(err) {
-					return res.status(500).send({ message: "Error occured, cannot proceed" })
-				}
 
 				const endpoint = "/verify?token="
 				const headerMessage = "Hello,\n\n" + "Please verify your account by clicking the link: \n"
 
-				sendConfirmationEmail(user, encodedToken, res, endpoint, headerMessage)
+				sendConfirmationEmail(user, encodedToken, endpoint, headerMessage)
+
+				// Error occured
+				if(err) {
+					res.status(500).json({ message: "Error occured, cannot proceed" })
+					return 
+				}
 
 			})
 
 			// Successfully create user in db, email sent, waiting for user email confirmation
-			return res.status(200).send({ message: "A verification link has been sent to "+ user.email + ", please verify your email." })
+			res.status(200).json({ message: "A verification link has been sent to "+ user.email + ", please verify your email." })
+			return 
 
 		})
 	}
 	catch(err) {
-		return res.status(500).send({ message: "Error occured, cannot proceed" })
+		res.status(500).json({ message: "Error occured, cannot proceed" })
+		return 
 	}
 }
 
@@ -113,11 +136,13 @@ exports.confirmEmail = function (req, res) {
 			.exec(async (err, emailToken) => {
 				// Error occured
 				if(err) {
-					return res.status(500).send({ message: "Error occured, cannot proceed" })
+					res.status(500).json({ message: "Error occured, cannot proceed" })
+					return 
 				}
 				// token is not found into database i.e. token may have expired 
 				if (!emailToken){
-					return res.status(400).send({message: "Your verification link may have expired. Please click on resend for verify your Email." })
+					res.status(400).json({message: "Your verification link may have expired. Please click on resend for verify your Email." })
+					return 
 				}
 				// if token is found then check valid user 
 				else{
@@ -126,15 +151,18 @@ exports.confirmEmail = function (req, res) {
 						.exec(async (err, user) => {
 						// Error occured
 						if(err) {
-							return res.status(500).send({ message: "Error occured, cannot proceed" })
+							res.status(500).json({ message: "Error occured, cannot proceed" })
+							return 
 						}
 						// User is not in the db, he must sign up
 						if (!user){
-							return res.status(400).send({message: "We were unable to find a user for this verification. Please sign up!"})
+							res.status(400).json({message: "We were unable to find a user for this verification. Please sign up!"})
+							return 
 						} 
 						// User is already verified
 						else if (user.isVerify){
-							return res.status(200).send({ message: "User has been already verified. Please Login" })
+							res.status(200).json({ message: "User has been already verified. Please Login" })
+							return 
 						}
 						// verify user
 						else{
@@ -143,11 +171,13 @@ exports.confirmEmail = function (req, res) {
 							user.save(function (err) {
 								// error occur
 								if(err){
-									return res.status(500).send({message: "Error occured, cannot proceed" })
+									res.status(500).json({message: "Error occured, cannot proceed" })
+									return 
 								}
 								// account successfully verified
 								else{
-									return res.status(200).send({ message: "Your account has been successfully verified" })
+									res.status(200).json({ message: "Your account has been successfully verified" })
+									return
 								}
 							})
 						}
@@ -156,7 +186,8 @@ exports.confirmEmail = function (req, res) {
 		})
 	}
 	catch(err) {
-		return res.status(500).send({ message: "Error occured, cannot proceed" })
+		res.status(500).json({ message: "Error occured, cannot proceed" })
+		return
 	}
 }
 
@@ -169,15 +200,18 @@ exports.resendLink = function (req, res) {
 			.exec(async (err, user) => {
 			// Error occured
 			if(err) {
-				return res.status(500).send({ message: "Error occured, cannot proceed" })
+				res.status(500).json({ message: "Error occured, cannot proceed" })
+				return
 			}
 			// user is not found into database
 			if (!user){
-				return res.status(400).send({ message: "We were unable to find a user with that email. Make sure your email is correct or sign up again!", })
+				res.status(400).json({ message: "We were unable to find a user with that email. Make sure your email is correct or sign up again!", })
+				return
 			}
 			// user has been already verified
 			else if (user.isVerify){
-				return res.status(200).send({ message: "This account has been already verified. Please log in.", })
+				res.status(200).json({ message: "This account has been already verified. Please log in.", })
+				return
 			} 
 			// resend verification link
 			else{
@@ -186,7 +220,8 @@ exports.resendLink = function (req, res) {
 				.exec(async (err, emailToken) => {
 					// Error occured
 					if(err) {
-						return res.status(500).send({ message: "Error occured, cannot proceed" })
+						res.status(500).json({ message: "Error occured, cannot proceed" })
+						return
 					}
 
 					const token = bcrypt.genSaltSync(10)
@@ -205,7 +240,8 @@ exports.resendLink = function (req, res) {
 						emailToken.save((err) => {
 							// Error occured
 							if(err) {
-								return res.status(500).send({ message: "Error occured, cannot proceed" })
+								res.status(500).json({ message: "Error occured, cannot proceed" })
+								return
 							}
 
 							const endpoint = "/verify?token="
@@ -213,12 +249,13 @@ exports.resendLink = function (req, res) {
 							// emailToken updated and new email sent to user
 							const headerMessage = "Hello,\n\n" + "Please verify your account by clicking the link: \n"
 
-							sendConfirmationEmail(user, encodedToken, res, endpoint, headerMessage)
+							sendConfirmationEmail(user, encodedToken, endpoint, headerMessage)
 
 						})
 
 						// Successfully create user in db, email sent, waiting for user email confirmation
-						return res.status(200).send({ message: "A verification link has been sent to "+ user.email + ", please verify your email." })
+						res.status(200).json({ message: "A verification link has been sent to "+ user.email + ", please verify your email." })
+						return
 
 					}
 
@@ -232,7 +269,8 @@ exports.resendLink = function (req, res) {
 						emailToken.save((err) => {
 							// Error occured
 							if(err) {
-								return res.status(500).send({ message: "Error occured, cannot proceed" })
+								res.status(500).json({ message: "Error occured, cannot proceed" })
+								return
 							}
 
 							const endpoint = "/verify?token="
@@ -240,11 +278,12 @@ exports.resendLink = function (req, res) {
 							// emailToken updated and new email sent to user
 							const headerMessage = "Hello,\n\n" + "Please verify your account by clicking the link: \n"
 
-							sendConfirmationEmail(user, encodedToken, res, endpoint, headerMessage)
+							sendConfirmationEmail(user, encodedToken, endpoint, headerMessage)
 						})
 
 						// Successfully create user in db, email sent, waiting for user email confirmation
-						return res.status(200).send({ message: "A verification link has been sent to "+ user.email + ", please verify your email." })
+						res.status(200).json({ message: "A verification link has been sent to "+ user.email + ", please verify your email." })
+						return
 
 					}
 				})
@@ -252,7 +291,8 @@ exports.resendLink = function (req, res) {
 		})
 	}
 	catch(err) {
-		return res.status(500).send({ message: "Error occured, cannot proceed" })
+		res.status(500).json({ message: "Error occured, cannot proceed" })
+		return
 	}
 }
 
@@ -265,11 +305,13 @@ exports.sendResetPasswordLink = function (req, res) {
 			.exec(async (err, user) => {
 			// Error occured
 			if(err) {
-				return res.status(500).send({ message: "Error occured, cannot proceed" })
+				res.status(500).json({ message: "Error occured, cannot proceed" })
+				return 
 			}
 			// user is not found into database
 			if (!user){
-				return res.status(400).send({ message: "We were unable to find a user with that email. Make sure your email is correct !", })
+				res.status(400).json({ message: "We were unable to find a user with that email. Make sure your email is correct !", })
+				return 
 			}
 			// resend verification link
 			else{
@@ -293,7 +335,8 @@ exports.sendResetPasswordLink = function (req, res) {
 				passwordToken.save((err) => {
 					// Error occured
 					if(err) {
-						return res.status(500).send({ message: "Error occured, cannot proceed" })
+						res.status(500).json({ message: "Error occured, cannot proceed" })
+						return 
 					}
 
 					const endpoint = "/resetpassword?token="
@@ -301,17 +344,19 @@ exports.sendResetPasswordLink = function (req, res) {
 					// passwordToken updated and new email sent to user
 					const headerMessage = "Hello,\n\n" + "Click on this link to reset your password: \n"
 
-					sendConfirmationEmail(user, encodedToken, res, endpoint, headerMessage)
+					sendConfirmationEmail(user, encodedToken, endpoint, headerMessage)
 				})
 
 				// Successfully create user in db, email sent, waiting for user email confirmation
-				return res.status(200).send({ message: "A reset link has been sent to "+ user.email + "." })
+				res.status(200).json({ message: "A reset link has been sent to "+ user.email + "." })
+				return 
 
 			}
 		})
 	}
 	catch(err) {
-		return res.status(500).send({ message: "Error occured, cannot proceed" })
+		res.status(500).json({ message: "Error occured, cannot proceed" })
+		return 
 	}
 }
 
@@ -327,11 +372,13 @@ exports.resetPassword = function (req, res) {
 			.exec(async (err, passwordToken) => {
 				// Error occured
 				if(err) {
-					return res.status(500).send({ message: "Error occured, cannot proceed" })
+					res.status(500).json({ message: "Error occured, cannot proceed" })
+					return 
 				}
 				// token is not found into database i.e. token may have expired 
 				if (!passwordToken){
-					return res.status(400).send({message: "Your verification link may have expired. Please click on resend for verify your Email." })
+					res.status(400).json({message: "Your verification link may have expired. Please click on resend for verify your Email." })
+					return 
 				}
 				// if token is found then check valid user 
 				else{
@@ -340,11 +387,13 @@ exports.resetPassword = function (req, res) {
 						.exec(async (err, user) => {
 						// Error occured
 						if(err) {
-							return res.status(500).send({ message: "Error occured, cannot proceed" })
+							res.status(500).json({ message: "Error occured, cannot proceed" })
+							return 
 						}
 						// User is not in the db, he must sign up
 						if (!user){
-							return res.status(400).send({message: "We were unable to find a user."})
+							res.status(400).json({message: "We were unable to find a user."})
+							return 
 						} 
 						// verify user
 						else{
@@ -356,11 +405,13 @@ exports.resetPassword = function (req, res) {
 							user.save(function (err) {
 								// error occur
 								if(err){
-									return res.status(500).send({message: "Error occured, cannot proceed" })
+									res.status(500).json({message: "Error occured, cannot proceed" })
+									return 
 								}
 								// account successfully verified
 								else{
-									return res.status(200).send({ message: "Your password resetted" })
+									res.status(200).json({ message: "Your password resetted" })
+									return 
 								}
 							})
 						}
@@ -370,7 +421,8 @@ exports.resetPassword = function (req, res) {
 		})
 	}
 	catch(err) {
-		return res.status(500).send({ message: "Error occured, cannot proceed" })
+		res.status(500).json({ message: "Error occured, cannot proceed" })
+		return 
 	}
 }
 
@@ -384,11 +436,13 @@ exports.signin = (req, res) => {
 			.exec(async (err, user) => {
 				// Error occureed
 				if(err) {
-					return res.status(500).send({ message: "Error occured, cannot proceed" })
+					res.status(500).json({ message: "Error occured, cannot proceed" })
+					return 
 				}
 				// Didn't find user
 				if(!user){
-					return res.status(401).send({ message: "Invalid email or password"})
+					res.status(401).json({ message: "Invalid email or password"})
+					return 
 				}
 
 				// Check user passphrase
@@ -398,11 +452,13 @@ exports.signin = (req, res) => {
 				)
 				// Passphrase not valid
 				if(!isPwdValid) {
-					return res.status(401).send({ message: "Invalid email or password", })
+					res.status(401).json({ message: "Invalid email or password", })
+					return 
 				}
 				// check user is verified or not
 				else if (!user.isVerify){
-					return res.status(401).send({ message: "Your email has not been verified.", });
+					res.status(401).json({ message: "Your email has not been verified.", })
+					return 
 				}
 
 				const accessToken = jwt.sign({ 
@@ -440,23 +496,26 @@ exports.signin = (req, res) => {
 					}
 				}
 
-				return res.status(200)
+				res.status(200)
 				.cookie('myToken', JSON.stringify(tokens), {
 					sameSite: process.env.NODE_ENV == "production" ? "lax" : "none",
 					secure: true,
 					httpOnly: true,
 					domain: process.env.NODE_ENV == "production" ? process.env.DOMAIN : ""
 				})
-				.send({
+				.json({
 					// TODO: to dig
 					id: user._id,
 					email: user.email,					
 					isAuthenticated: true 
 				})
+
+				return 
 			})
 	}
 	catch(err) {
-		return res.status(500).send({ message: "Error occured, cannot proceed" })
+		res.status(500).json({ message: "Error occured, cannot proceed" })
+		return 
 	}
 }
 
@@ -476,15 +535,16 @@ exports.refreshToken = async (req, res) => {
 		else requestToken = null
 
 		if(requestToken == null) {
-			return res.status(403).json({ message: "Refresh token is required" })
+			res.status(403).json({ message: "Refresh token is required" })
+			return 
 		} 
 
 		let refreshToken = await RefreshToken.findOne({ token: requestToken })
 
 		if(!refreshToken) {
 
-			return res.status(403).json({ message: "Refresh token is not in the database. Please make a new signin request" })
-
+			res.status(403).json({ message: "Refresh token is not in the database. Please make a new signin request" })
+			return 
 		}
 
 		let verifyExpiration = await RefreshToken.verifyExpiration(refreshToken)
@@ -493,7 +553,8 @@ exports.refreshToken = async (req, res) => {
 
 			RefreshToken.findByIdAndRemove(refreshToken._id.valueOf(), { useFindAndRemove: false, }).exec()
 
-			return res.status(403).json({ message: "Refresh token was expired. Please make a new signin request" })
+			res.status(403).json({ message: "Refresh token was expired. Please make a new signin request" })
+			return 
 
 		}
 
@@ -508,17 +569,20 @@ exports.refreshToken = async (req, res) => {
 		const stgTokens = JSON.stringify(tokens)
 		
 		// set the cookie with the new token
-		return res.status(200)
+		res.status(200)
 		.cookie('myToken', stgTokens, {
 			sameSite: process.env.NODE_ENV == "production" ? "lax" : "none",
 			secure: true,
 			httpOnly: true,
 			domain: process.env.NODE_ENV == "production" ? process.env.DOMAIN : ""
 		})
-		.send({ message: "New token has been created" })
+		.json({ message: "New token has been created" })
+
+		return 
 	}
 
 	catch(err) {
-		return res.status(500).send({ message: "Error occured, cannot proceed" })
+		res.status(500).json({ message: "Error occured, cannot proceed" })
+		return 
 	}
 }
