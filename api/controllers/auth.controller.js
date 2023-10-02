@@ -366,7 +366,7 @@ exports.refreshToken = async (req, res) => {
 		// Parse the cookie to get the tokens
 		let accessToken = req.headers['cookie']
 		let getCookie = new URLSearchParams(accessToken)
-		// TODO: must rename it
+
 		const myToken = getCookie.get('myToken')
 
 		// Get the object containing accessToken and refreshToken
