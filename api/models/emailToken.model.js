@@ -6,7 +6,7 @@
 
 const mongoose = require("mongoose")
 
-const halfAnHour = 30 * 60
+const tenMinutes = 60 * 60
 
 // Mongoose schema
 const emailTokenSchema = new mongoose.Schema({
@@ -21,7 +21,7 @@ const emailTokenSchema = new mongoose.Schema({
 	},
 	expiryDate: {
 		type: Date,
-		expires: halfAnHour,
+		expires: tenMinutes,
 		default: Date.now(),
 	},
 })

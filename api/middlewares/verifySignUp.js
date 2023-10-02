@@ -16,12 +16,14 @@ checkDuplicateEmail = (req, res, next) => {
 		}).exec((err, user) => {
 			// Error occured
 			if(err) {
-				return res.status(500).send({ message: "Error occured, cannot proceed" })
+				res.status(500).send({ message: "Error occured, cannot proceed" })
+				return 
 			}
 
 			// Email address already in db
 			if(user) {
-				return res.status(400).send({ message: "This email address is already associated with another account."})
+				res.status(400).send({ message: "This email address is already associated with another account."})
+				return 
 			}
 
 			next()
@@ -29,7 +31,8 @@ checkDuplicateEmail = (req, res, next) => {
 
 	}
 	catch(err) {
-		return res.status(500).send({ message: "Error occured, cannot proceed" })
+		res.status(500).send({ message: "Error occured, cannot proceed" })
+		return 
 	}
 
 }

@@ -4,12 +4,12 @@ require('dotenv').config()
 const { TokenExpiredError, } = jwt;
 
 const catchError = (err, res) => {
-  if (err instanceof TokenExpiredError) {
-	res.status(401).json({ message: "Unauthorized! Access Token was expired!" })
-  }
-  else {
-	res.sendStatus(401).json({ message: "Unauthorized!" })
-  }
+	if (err instanceof TokenExpiredError) {
+		res.status(401).json({ message: "Unauthorized! Access Token was expired!" })
+	}
+	else {
+		res.sendStatus(401).json({ message: "Unauthorized!" })
+	}
 }
 
 const verifyToken = (req, res, next) => {

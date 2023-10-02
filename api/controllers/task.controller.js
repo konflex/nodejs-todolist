@@ -53,7 +53,7 @@ exports.deleteManyTasks = (req, res) => {
 
 	Task.deleteMany(req.body.filter).exec()
 
-	res.send({ 
+	res.status(200).json({ 
 		message: "All todos deleted successfully", 
 	})
 	return

@@ -18,16 +18,10 @@ module.exports = function(app) {
 		next()
 	})
 
-	// app.get("/api/checkAuth",	[authJwt.verifyToken],controller.checkAuth)
-
 	app.get("/api/tasks",		[authJwt.verifyToken],	controller.allTasks)
-
 	app.delete("/api/tasks",	[authJwt.verifyToken],	controller.deleteManyTasks)
-
 	app.post("/api/task",		[authJwt.verifyToken], 	controller.postTask)
-
 	app.delete("/api/task",		[authJwt.verifyToken], 	controller.deleteTask)
-
 	app.put("/api/task",		[authJwt.verifyToken], 	controller.updateTask)
 
 }

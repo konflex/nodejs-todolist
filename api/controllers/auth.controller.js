@@ -5,7 +5,7 @@
 */
 
 const db = require("../models")
-const nodemailer = require("nodemailer");
+const nodemailer = require("nodemailer")
 
 const User = db.user
 const RefreshToken = db.refreshToken
@@ -19,23 +19,27 @@ var bcrypt = require("bcryptjs")
 
 
 /**
- * 
- * @param {*} user 
- * @param {*} encodedToken 
- * @param {*} res 
- * @param {*} endpoint 
- * @param {*} headerMessage 
- * @returns 
+ * Sends email to a user with an encoded token (account verification, reset password).
+ *
+ * @param {Object} user - The user object containing user information.
+ * @param {string} encodedToken - The encoded token to be included in the verification link.
+ * @param {string} endpoint - The endpoint where the user can verify their account.
+ * @param {string} bodyMessage - The body message to include in the email body.
+ * @returns {Promise<boolean>} A Promise that resolves to true if the email is sent successfully, or false if there is an error.
  */
-function sendConfirmationEmail(user, encodedToken, endpoint, headerMessage) {
+async function sendMailWithVerificationLink(user, encodedToken, endpoint, sujectMessage, bodyMessage) {
 
 	try{
 
-		// Send email
+		// create reusable transporter object using the default SMTP transport
 		const transporter = nodemailer.createTransport({ 
 			host: "smtpout.secureserver.net",  
 			port: 587,
-			auth: { user: process.env.EMAIL_USERNAME, pass: process.env.EMAIL_PASSWORD },
+			secure: false, // true for 465, false for other ports
+			auth: { 
+				user: process.env.EMAIL_USERNAME, 
+				pass: process.env.EMAIL_PASSWORD 
+			},
 		})
 
 		const node_env = process.env.NODE_ENV
@@ -45,28 +49,34 @@ function sendConfirmationEmail(user, encodedToken, endpoint, headerMessage) {
 		const mailOptions = {
 			from: process.env.EMAIL_USERNAME, 
 			to: user.email, 
-			subject: "Account Verification Link", 
-			text: headerMessage + 
-			link + 
-			"\n\nThank You!\n" 
+			subject: sujectMessage, 
+			text: bodyMessage + link + "\n\nThank You!\n" 
 		}
 
-		transporter.sendMail(mailOptions, function (err) {
-			// Error occured
-			if (err) { 
-				return false
-			}
-			else {
-				return true
-			}
-		})
+		await transporter.sendMail(mailOptions)
+
+		// Returns true if mail sent successfully
+		return true
+
 	}
 	catch(err) {
+		// False if error occured
 		return false
 	}
 }
 
-exports.signup = (req, res) => {
+
+/**
+ * Register a new user, send a confirmation email and handle errors.
+ *
+ * @param {Request} req - The Express request object.
+ * @param {Response} res - The Express response object.
+ * @returns {Promise<void>} - A promise that resolves when the signup process is complete.
+ */
+exports.signup = async (req, res) => {
+
+	let savedEmailToken
+	let savedUser
 
 	try {
 
@@ -75,514 +85,478 @@ exports.signup = (req, res) => {
 				password: bcrypt.hashSync(req.body.password,10)
 		})
 
-		user.save((err, user) => {
-			// Error occured
-			if(err) {
-				res.status(500).json({ message: "Error occured, cannot proceed" })
-				return 
-			}
+		// Save user to the database
+		savedUser = await user.save()
+		// Generate a token for email verification
+		const token = bcrypt.genSaltSync(10)
+		// Create an email token for the user
+		const emailToken = new EmailToken({
+			user:user._id.toHexString(),
+			token: token,
+		})
 
-			const token = bcrypt.genSaltSync(10)
+		// Save the email token to the database
+		savedEmailToken = await emailToken.save()
 
-			// Generate token model and save
-			const emailToken = new EmailToken({
-				user:user._id.toHexString(),
-				token: token,
-			})
+		// Create an encoded token for JWT
+		const encodedToken = jwt.sign({
+			email: user.email,				
+			token: token,
+		},
+			process.env.SECRET_KEY
+		)
+		// Define the verification link endpoint and message
+		const endpoint = "/verify?token="
+		const sujectMessage = "Account Verification Link"
+		const bodyMessage = "Hello,\n\n" + "Please verify your account by clicking the link: \n"
+		// Send a confirmation email to the user
+		const emailSent = await sendMailWithVerificationLink(user, encodedToken, endpoint, sujectMessage, bodyMessage)
 
-			const encodedToken = jwt.sign({
-				email: user.email,				
-				token: token,
-				// TODO: add expiration date
-			}, 
-				process.env.SECRET_KEY
-			)
-
-			emailToken.save((err) => {
-
-				const endpoint = "/verify?token="
-				const headerMessage = "Hello,\n\n" + "Please verify your account by clicking the link: \n"
-
-				sendConfirmationEmail(user, encodedToken, endpoint, headerMessage)
-
-				// Error occured
-				if(err) {
-					res.status(500).json({ message: "Error occured, cannot proceed" })
-					return 
-				}
-
-			})
-
+		if(emailSent) {
 			// Successfully create user in db, email sent, waiting for user email confirmation
-			res.status(200).json({ message: "A verification link has been sent to "+ user.email + ", please verify your email." })
-			return 
-
-		})
+			res.status(200).json({ message: "A verification link has been sent, please check you mail box." })
+			return
+		}
+		else {
+			// Handle the case when email was not sent successfully and delete the user and email token records
+			await User.findByIdAndRemove(savedUser._id)
+			await EmailToken.findByIdAndRemove(savedEmailToken._id)
+			res.status(500).json({ message: "Error occured, cannot proceed" })
+			return
+		}
 	}
 	catch(err) {
-		res.status(500).json({ message: "Error occured, cannot proceed" })
-		return 
-	}
-}
-
-
-exports.confirmEmail = function (req, res) {
-
-	try {
-
-		const decoded = jwt.verify(decodeURIComponent(req.params.token), process.env.SECRET_KEY)
+		// Delete user and email token records if error occured
+		if (savedUser) {
+			await User.findByIdAndRemove(savedUser._id)
+		}
+		if (savedEmailToken) {
+			await EmailToken.findByIdAndRemove(savedEmailToken._id)
+		}
 		
-		EmailToken.findOne({ token: decoded.token })
-			.exec(async (err, emailToken) => {
-				// Error occured
-				if(err) {
-					res.status(500).json({ message: "Error occured, cannot proceed" })
-					return 
-				}
-				// token is not found into database i.e. token may have expired 
-				if (!emailToken){
-					res.status(400).json({message: "Your verification link may have expired. Please click on resend for verify your Email." })
-					return 
-				}
-				// if token is found then check valid user 
-				else{
-
-					User.findOne({ _id: emailToken.user, email: decoded.email })
-						.exec(async (err, user) => {
-						// Error occured
-						if(err) {
-							res.status(500).json({ message: "Error occured, cannot proceed" })
-							return 
-						}
-						// User is not in the db, he must sign up
-						if (!user){
-							res.status(400).json({message: "We were unable to find a user for this verification. Please sign up!"})
-							return 
-						} 
-						// User is already verified
-						else if (user.isVerify){
-							res.status(200).json({ message: "User has been already verified. Please Login" })
-							return 
-						}
-						// verify user
-						else{
-							// change isVerify to true
-							user.isVerify = true
-							user.save(function (err) {
-								// error occur
-								if(err){
-									res.status(500).json({message: "Error occured, cannot proceed" })
-									return 
-								}
-								// account successfully verified
-								else{
-									res.status(200).json({ message: "Your account has been successfully verified" })
-									return
-								}
-							})
-						}
-					})
-				}
-		})
-	}
-	catch(err) {
 		res.status(500).json({ message: "Error occured, cannot proceed" })
+		return 
+	}
+}
+
+
+/**
+ * Confirm a user's email address based on a verification token.
+ *
+ * @param {Request} req - The Express request object.
+ * @param {Response} res - The Express response object.
+ * @returns {Promise<void>} - A promise that resolves when the confirmation is complete or rejects on error.
+ */
+exports.confirmEmail = async (req, res) => {
+
+	try {
+		// Decode token with JWT
+		const decoded = jwt.verify(decodeURIComponent(req.params.token), process.env.SECRET_KEY)
+		// Find email token in the db
+		const emailToken = await EmailToken.findOne({ token: decoded.token })
+
+		// No token was found, user should click on resend link 
+		if (!emailToken) {
+			res.status(400).json({ message: "Your verification link may have expired. Please click on resend link to verify your email." })
+			return
+		}
+		// Find user with email token and decoded email
+		const user = await User.findOne({ _id: emailToken.user, email: decoded.email })
+		// No user was found
+		if (!user) {
+			res.status(400).json({ message: "We were unable to find a user for this verification. Please sign up!" })
+			return
+		}
+		// User email already verify
+		if (user.isVerify) {
+			res.status(200).json({ message: "User has already been verified. Please login." })
+			return
+		}
+		// Confirm email in db and save it
+		user.isVerify = true
+		await user.save()
+
+		res.status(200).json({ message: "Your account has been successfully verified" })
+		return
+
+	} catch (err) {
+		res.status(500).json({ message: "Error occurred, cannot proceed" })
 		return
 	}
 }
 
 
-exports.resendLink = function (req, res) {
+/**
+ * Resends the email verification link to a user who has signed up but not yet verified their email address.
+ *
+ * @param {Request} req - The Express request object containing the user's email.
+ * @param {Response} res - The Express response object for sending the response.
+ * @returns {Promise<void>} - A promise that resolves when the email is resent or rejects on error.
+ */
+exports.resendLink = async (req, res) => {
 
 	try {
+		// Find the user by email
+		const user = await User.findOne({ email: req.body.email })
 
-		User.findOne({ email: req.body.email })
-			.exec(async (err, user) => {
-			// Error occured
-			if(err) {
-				res.status(500).json({ message: "Error occured, cannot proceed" })
-				return
-			}
-			// user is not found into database
-			if (!user){
-				res.status(400).json({ message: "We were unable to find a user with that email. Make sure your email is correct or sign up again!", })
-				return
-			}
-			// user has been already verified
-			else if (user.isVerify){
-				res.status(200).json({ message: "This account has been already verified. Please log in.", })
-				return
-			} 
-			// resend verification link
-			else{
-
-				EmailToken.findOne({ user: user._id })
-				.exec(async (err, emailToken) => {
-					// Error occured
-					if(err) {
-						res.status(500).json({ message: "Error occured, cannot proceed" })
-						return
-					}
-
-					const token = bcrypt.genSaltSync(10)
-					const encodedToken = jwt.sign({
-						email: user.email,				
-						token: token,
-						// TODO: add expiration date
-					}, 
-						process.env.SECRET_KEY
-					)
-
-					if(emailToken) {
-
-						emailToken.token = encodedToken
-
-						emailToken.save((err) => {
-							// Error occured
-							if(err) {
-								res.status(500).json({ message: "Error occured, cannot proceed" })
-								return
-							}
-
-							const endpoint = "/verify?token="
-
-							// emailToken updated and new email sent to user
-							const headerMessage = "Hello,\n\n" + "Please verify your account by clicking the link: \n"
-
-							sendConfirmationEmail(user, encodedToken, endpoint, headerMessage)
-
-						})
-
-						// Successfully create user in db, email sent, waiting for user email confirmation
-						res.status(200).json({ message: "A verification link has been sent to "+ user.email + ", please verify your email." })
-						return
-
-					}
-
-					else {
-						// generate token model and save
-						const emailToken = new EmailToken({
-							user:user._id.toHexString(),
-							token: encodedToken,
-						})
-
-						emailToken.save((err) => {
-							// Error occured
-							if(err) {
-								res.status(500).json({ message: "Error occured, cannot proceed" })
-								return
-							}
-
-							const endpoint = "/verify?token="
-
-							// emailToken updated and new email sent to user
-							const headerMessage = "Hello,\n\n" + "Please verify your account by clicking the link: \n"
-
-							sendConfirmationEmail(user, encodedToken, endpoint, headerMessage)
-						})
-
-						// Successfully create user in db, email sent, waiting for user email confirmation
-						res.status(200).json({ message: "A verification link has been sent to "+ user.email + ", please verify your email." })
-						return
-
-					}
-				})
-			}
-		})
-	}
-	catch(err) {
-		res.status(500).json({ message: "Error occured, cannot proceed" })
-		return
-	}
-}
-
-
-exports.sendResetPasswordLink = function (req, res) {
-
-	try {
-
-		User.findOne({ email: req.body.email })
-			.exec(async (err, user) => {
-			// Error occured
-			if(err) {
-				res.status(500).json({ message: "Error occured, cannot proceed" })
-				return 
-			}
-			// user is not found into database
-			if (!user){
-				res.status(400).json({ message: "We were unable to find a user with that email. Make sure your email is correct !", })
-				return 
-			}
-			// resend verification link
-			else{
-
-				const token = bcrypt.genSaltSync(10)
-
-				const encodedToken = jwt.sign({
-					email: user.email,				
-					token: token,
-					// TODO: add expiration date
-				}, 
-					process.env.SECRET_KEY
-				)
-
-				// generate password token model and save
-				const passwordToken = new PasswordToken({
-					user:user._id.toHexString(),
-					token: token,
-				})
-
-				passwordToken.save((err) => {
-					// Error occured
-					if(err) {
-						res.status(500).json({ message: "Error occured, cannot proceed" })
-						return 
-					}
-
-					const endpoint = "/resetpassword?token="
-
-					// passwordToken updated and new email sent to user
-					const headerMessage = "Hello,\n\n" + "Click on this link to reset your password: \n"
-
-					sendConfirmationEmail(user, encodedToken, endpoint, headerMessage)
-				})
-
-				// Successfully create user in db, email sent, waiting for user email confirmation
-				res.status(200).json({ message: "A reset link has been sent to "+ user.email + "." })
-				return 
-
-			}
-		})
-	}
-	catch(err) {
-		res.status(500).json({ message: "Error occured, cannot proceed" })
-		return 
-	}
-}
-
-
-exports.resetPassword = function (req, res) {
-
-	try {
-
-		const token = req.params.token
-		const decoded = jwt.verify(token, process.env.SECRET_KEY)
-
-		PasswordToken.findOne({ token: decoded.token })
-			.exec(async (err, passwordToken) => {
-				// Error occured
-				if(err) {
-					res.status(500).json({ message: "Error occured, cannot proceed" })
-					return 
-				}
-				// token is not found into database i.e. token may have expired 
-				if (!passwordToken){
-					res.status(400).json({message: "Your verification link may have expired. Please click on resend for verify your Email." })
-					return 
-				}
-				// if token is found then check valid user 
-				else{
-
-					User.findOne({ _id: passwordToken.user, })
-						.exec(async (err, user) => {
-						// Error occured
-						if(err) {
-							res.status(500).json({ message: "Error occured, cannot proceed" })
-							return 
-						}
-						// User is not in the db, he must sign up
-						if (!user){
-							res.status(400).json({message: "We were unable to find a user."})
-							return 
-						} 
-						// verify user
-						else{
-
-							const newPassword = bcrypt.hashSync(req.body.password,10)
-							
-							// change isVerify to true
-							user.password = newPassword
-							user.save(function (err) {
-								// error occur
-								if(err){
-									res.status(500).json({message: "Error occured, cannot proceed" })
-									return 
-								}
-								// account successfully verified
-								else{
-									res.status(200).json({ message: "Your password resetted" })
-									return 
-								}
-							})
-						}
-
-					})
-				}
-		})
-	}
-	catch(err) {
-		res.status(500).json({ message: "Error occured, cannot proceed" })
-		return 
-	}
-}
-
-exports.signin = (req, res) => {
-
-	try {
-		// Find user
-		User.findOne({
-			email: req.body.email
-		})
-			.exec(async (err, user) => {
-				// Error occureed
-				if(err) {
-					res.status(500).json({ message: "Error occured, cannot proceed" })
-					return 
-				}
-				// Didn't find user
-				if(!user){
-					res.status(401).json({ message: "Invalid email or password"})
-					return 
-				}
-
-				// Check user passphrase
-				const isPwdValid = bcrypt.compareSync(
-					req.body.password,
-					user.password
-				)
-				// Passphrase not valid
-				if(!isPwdValid) {
-					res.status(401).json({ message: "Invalid email or password", })
-					return 
-				}
-				// check user is verified or not
-				else if (!user.isVerify){
-					res.status(401).json({ message: "Your email has not been verified.", })
-					return 
-				}
-
-				const accessToken = jwt.sign({ 
-					id: user.id,
-					exp: Math.floor(Date.now() / 1000) + parseInt(process.env.TOKEN_EXPIRATION),
-				}, 
-					process.env.SECRET_KEY
-				)
-
-				const tokens = {
-					accessToken: undefined,
-					refreshToken: undefined,
-				}
-
-				// Get refresh token 
-				let refreshToken = await RefreshToken.findOne({ user: user })
-
-				// Refresh token is expired
-				if(!refreshToken) {
-					// Renew refresh token
-					refreshToken = await RefreshToken.createToken(user)
-					// Store new created tokens 
-					if(refreshToken && refreshToken.token) {
-						tokens.refreshToken = refreshToken.token
-						tokens.accessToken = accessToken
-					}
-				}
-
-				// Refresh token is not expired
-				else {
-
-					if(refreshToken.token) {
-						tokens.refreshToken = refreshToken.token
-						tokens.accessToken = accessToken
-					}
-				}
-
-				res.status(200)
-				.cookie('myToken', JSON.stringify(tokens), {
-					sameSite: process.env.NODE_ENV == "production" ? "lax" : "none",
-					secure: true,
-					httpOnly: true,
-					domain: process.env.NODE_ENV == "production" ? process.env.DOMAIN : ""
-				})
-				.json({
-					// TODO: to dig
-					id: user._id,
-					email: user.email,					
-					isAuthenticated: true 
-				})
-
-				return 
-			})
-	}
-	catch(err) {
-		res.status(500).json({ message: "Error occured, cannot proceed" })
-		return 
-	}
-}
-
-exports.refreshToken = async (req, res) => {
-	try {
-
-		let accessToken = req.headers["cookie"]
-		let getCookie = new URLSearchParams(accessToken)
-		const myToken = getCookie.get('myToken')
-
-		// get the object containing accessToken and refreshToken 
-		const tokens = JSON.parse(myToken)
-
-		let requestToken 
-
-		if(tokens && typeof tokens === 'object' && tokens.refreshToken) requestToken = tokens.refreshToken
-		else requestToken = null
-
-		if(requestToken == null) {
-			res.status(403).json({ message: "Refresh token is required" })
-			return 
-		} 
-
-		let refreshToken = await RefreshToken.findOne({ token: requestToken })
-
-		if(!refreshToken) {
-
-			res.status(403).json({ message: "Refresh token is not in the database. Please make a new signin request" })
-			return 
+		// If user not found, respond with an error message
+		if (!user) {
+			res.status(400).json({ message: "We were unable to find a user with that email. Make sure your email is correct or sign up again!" })
+			return
 		}
 
-		let verifyExpiration = await RefreshToken.verifyExpiration(refreshToken)
-
-		if(verifyExpiration) {
-
-			RefreshToken.findByIdAndRemove(refreshToken._id.valueOf(), { useFindAndRemove: false, }).exec()
-
-			res.status(403).json({ message: "Refresh token was expired. Please make a new signin request" })
-			return 
-
+		// If user is already verified, respond accordingly
+		if (user.isVerify) {
+			res.status(200).json({ message: "This account has already been verified. Please log in." })
+			return
 		}
 
-		let newAccessToken = jwt.sign({ 
-			id: refreshToken.user.valueOf(), 
-			exp: Math.floor(Date.now() / 1000) + parseInt(process.env.TOKEN_EXPIRATION), }, 
+		// Generate a new verification token
+		const token = bcrypt.genSaltSync(10)
+		const encodedToken = jwt.sign(
+			{
+			email: user.email,
+			token: token,
+			},
 			process.env.SECRET_KEY
 		)
 
-		tokens.accessToken = newAccessToken
-		
-		const stgTokens = JSON.stringify(tokens)
-		
-		// set the cookie with the new token
-		res.status(200)
-		.cookie('myToken', stgTokens, {
+		// Find or create an EmailToken record
+		let emailToken = await EmailToken.findOne({ user: user._id })
+
+
+		if (!emailToken) {
+			emailToken = new EmailToken({
+			user: user._id.toHexString(),
+			token: token,
+			})
+		}
+		else {
+			emailToken.token = token
+		}
+
+		// Save the EmailToken record
+		await emailToken.save()
+
+		// Define the verification link endpoint and message
+		const endpoint = "/verify?token="
+		const subjectMessage = "Account Verification Link"
+		const bodyMessage = "Hello,\n\n" + "Please verify your account by clicking the link: \n"
+
+		// Send the confirmation email and handle the result
+		const emailSent = await sendMailWithVerificationLink(user, encodedToken, endpoint, subjectMessage, bodyMessage)
+
+		if (emailSent) {
+			// Email sent successfully
+			res.status(200).json({ message: "A verification link has been sent, please verify your email box." })
+			return
+		}
+		else {
+			// Error occured when sending mail
+			res.status(500).json({ message: "Error occurred, cannot proceed" })
+			return
+
+		}
+	} catch (err) {
+		res.status(500).json({ message: "Error occurred, cannot proceed" })
+		return
+
+	}
+}
+
+
+
+/**
+ * Signs in a user, generates access and refresh tokens, and sets cookies.
+ *
+ * @param {Request} req - The Express request object containing user credentials.
+ * @param {Response} res - The Express response object for sending the response.
+ * @returns {Promise<void>} - A promise that resolves when the user is signed in or rejects on error.
+ */
+exports.signin = async (req, res) => {
+
+	try {
+		// Find the user by email
+		const user = await User.findOne({ email: req.body.email })
+
+		// If user not found, respond with an error message
+		if (!user) {
+			res.status(401).json({ message: "Invalid email or password" })
+			return
+		}
+
+		// Check user passphrase
+		const isPwdValid = bcrypt.compareSync(req.body.password, user.password)
+
+		// Passphrase not valid
+		if (!isPwdValid) {
+			res.status(401).json({ message: "Invalid email or password" })
+			return
+		}
+
+		// Check if the user is verified
+		if (!user.isVerify) {
+			res.status(401).json({ message: "Invalid email or password" })
+			return
+		}
+
+		// Generate an access token
+		const accessToken = jwt.sign(
+		{
+			id: user.id,
+			exp: Math.floor(Date.now() / 1000) + parseInt(process.env.TOKEN_EXPIRATION),
+		},
+		process.env.SECRET_KEY
+		)
+
+		// Initialize tokens
+		const tokens = {
+			accessToken: undefined,
+			refreshToken: undefined,
+		}
+
+		// Find or create a refresh token
+		let refreshToken = await RefreshToken.findOne({ user: user })
+
+		// Refresh token is expired or does not exist
+		if (!refreshToken) {
+			// Create a new refresh token
+			refreshToken = await RefreshToken.createToken(user)
+		}
+
+		// Store new created tokens if a refresh token exists
+		tokens.refreshToken = refreshToken.token
+		tokens.accessToken = accessToken
+
+		// Set the cookie with tokens
+		res.cookie('myToken', JSON.stringify(tokens), {
 			sameSite: process.env.NODE_ENV == "production" ? "lax" : "none",
 			secure: true,
 			httpOnly: true,
-			domain: process.env.NODE_ENV == "production" ? process.env.DOMAIN : ""
+			domain: process.env.NODE_ENV == "production" ? process.env.DOMAIN : "",
 		})
-		.json({ message: "New token has been created" })
 
+		// Send the JSON response
+		res.status(200).json({
+			id: user._id,
+			email: user.email,
+			isAuthenticated: true,
+		})
+
+		return
+
+	} catch (err) {
+		res.status(500).json({ message: "Error occurred, cannot proceed" })
+		return
+	}
+}
+
+
+/**
+ * Refreshes the access token using a valid refresh token and sets the updated token in a cookie.
+ *
+ * @param {Object} req - The Express.js request object.
+ * @param {Object} res - The Express.js response object.
+ * @returns {void}
+ */
+//TODO: to check if token is well renew
+exports.refreshToken = async (req, res) => {
+
+	try {
+		// Parse the cookie to get the tokens
+		let accessToken = req.headers['cookie']
+		let getCookie = new URLSearchParams(accessToken)
+		// TODO: must rename it
+		const myToken = getCookie.get('myToken')
+
+		// Get the object containing accessToken and refreshToken
+		const tokens = JSON.parse(myToken)
+
+		let requestToken
+
+		if (tokens && typeof tokens === 'object' && tokens.refreshToken) {
+			requestToken = tokens.refreshToken
+		} 
+		else {
+			requestToken = null
+		}
+
+		if (requestToken === null) {
+			res.status(403).json({ message: 'Refresh token is required' })
+			return
+		}
+
+		// Find the refresh token in the database
+		let refreshToken = await RefreshToken.findOne({ token: requestToken })
+
+		if (!refreshToken) {
+			res.status(403).json({ message: 'Refresh token is not in the database. Please make a new signin request', })
+			return
+		}
+
+		// Verify if the refresh token has expired
+		let verifyExpiration = await RefreshToken.verifyExpiration(refreshToken)
+
+		if (verifyExpiration) {
+			// Remove the expired refresh token from the database
+			await RefreshToken.findByIdAndRemove(refreshToken._id, {
+				useFindAndRemove: false,
+			}).exec()
+
+			res.status(403).json({ message: 'Refresh token was expired. Please make a new signin request', })
+			return
+		}
+
+		// Generate a new access token
+		let newAccessToken = jwt.sign(
+		{
+			id: refreshToken.user,
+			exp:
+			Math.floor(Date.now() / 1000) +
+			parseInt(process.env.TOKEN_EXPIRATION),
+		},
+		process.env.SECRET_KEY
+		)
+
+		// Update the access token in the tokens object
+		tokens.accessToken = newAccessToken
+
+		// Serialize the updated tokens object
+		const stgTokens = JSON.stringify(tokens)
+
+		// Set the cookie with the new token
+		res.cookie('myToken', stgTokens, {
+			sameSite: process.env.NODE_ENV == 'production' ? 'lax' : 'none',
+			secure: true,
+			httpOnly: true,
+			domain: process.env.NODE_ENV == 'production' ? process.env.DOMAIN : '',
+		})
+
+		// Respond with a 200 status code (no specific message for security)
+		res.status(200).send()
+
+		return
+
+	} catch (err) {
+		res.status(500).json({ message: 'Error occurred, cannot proceed' })
 		return 
 	}
+}
 
-	catch(err) {
-		res.status(500).json({ message: "Error occured, cannot proceed" })
-		return 
+
+/**
+ * Sends a reset password link to a user's email.
+ *
+ * @param {Object} req - Express request object containing user's email.
+ * @param {Object} res - Express response object to send HTTP response.
+ */
+// TODO: to test
+exports.sendResetPasswordLink = async (req, res) => {
+
+	try {
+		// Find a user in the database based on the provided email address
+		const user = await User.findOne({ email: req.body.email })
+
+		// If the user is not found, return a response with a 400 status code and an error message
+		if (!user) {
+			res.status(400).json({ message: "We were unable to find a user with that email. Make sure your email is correct!" })
+			return
+		}
+	
+		// Generate a token for resetting the password
+		const token = bcrypt.genSaltSync(10)
+	
+		// Create an encoded token using JWT
+		const encodedToken = jwt.sign({
+			email: user.email,
+			token: token,
+			// TODO: Add expiration date if needed
+		}, process.env.SECRET_KEY)
+	
+		// Create a PasswordToken model and save it to the database
+		const passwordToken = new PasswordToken({
+			user: user._id.toHexString(),
+			token: token,
+		})
+
+		await passwordToken.save()
+	
+		// Define the reset password link endpoint
+		const endpoint = "/resetpassword?token="
+		const subjectMessage = "Reset your password"
+		// Create a header message for the reset password email
+		const bodyMessage = "Hello,\n\n" + "Click on this link to reset your password: \n"
+	
+		// Attempt to send the reset password email
+		const emailSent = await sendMailWithVerificationLink(user, encodedToken, endpoint, subjectMessage, bodyMessage)
+	
+		if (emailSent) {
+			// Email sent successfully and password token created in the database
+			res.status(200).json({ message: "A reset link has been sent to your email." })
+			return
+		}
+		else {
+			// Email sending failed you can handle this case here
+			// For example, you might want to log the failure or respond with an error message
+			res.status(500).json({ message: "Error occurred while sending the email." })
+			return
+		}
+
+	}
+	catch (err) {
+		// Catch and handle any errors that occurred during execution
+		res.status(500).json({ message: "An error occurred, cannot proceed." })
+		return
+	}
+}
+
+/**
+ * Reset a user's password based on a provided token.
+ *
+ * @param {Object} req - Express request object containing token and new password.
+ * @param {Object} res - Express response object to send HTTP response.
+ */
+// TODO: test it
+exports.resetPassword = async (req, res) => {
+	try {
+		// Get the token from request parameters
+		const token = req.params.token
+	
+		// Verify and decode the token using the SECRET_KEY
+		const decoded = jwt.verify(token, process.env.SECRET_KEY)
+	
+		// Find the PasswordToken in the database based on the decoded token
+		const passwordToken = await PasswordToken.findOne({ token: decoded.token })
+	
+		// If the token is not found in the database, it may have expired
+		if (!passwordToken) {
+			res.status(400).json({ message: "Your verification link may have expired. Please click on resend to verify your email." })
+			return
+		}
+
+		// If the token is found, check if the associated user exists
+		const user = await User.findOne({ _id: passwordToken.user })
+	
+		// If the user does not exist in the database, prompt them to sign up
+		if (!user) {
+			res.status(400).json({ message: "We were unable to find a user." })
+			return
+		}
+
+		// Hash the new password
+		const newPassword = bcrypt.hashSync(req.body.password, 10)
+
+		// Update the user's password and save changes
+		user.password = newPassword
+		await user.save()
+
+		// Password reset successful
+		res.status(200).json({ message: "Your password has been reset." })
+		return
+	}
+	catch (err) {
+		// Handle any unexpected errors
+		res.status(500).json({ message: "An error occurred, cannot proceed" })
+		return
 	}
 }
