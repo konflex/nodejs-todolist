@@ -9,9 +9,6 @@ require('dotenv').config()
 const corsMiddleware = require("./corsMiddleware")
 const app = express()
 
-// preflight
-//app.options("*", corsMiddleware)
-
 app.use(corsMiddleware)
 
 // add middleware before routes
@@ -38,7 +35,6 @@ db.mongoose
 		process.exit()
 	})
 
-
 app.get('/', (req,res) => {
 	res.json({ message: "Welcome to the todo list application"})
 })
@@ -47,6 +43,16 @@ app.get('/', (req,res) => {
 require("./api/routes/auth.routes")(app)
 require("./api/routes/task.routes")(app)
 
+
+// Error handling middleware for CORS errors
+app.use((err, req, res, next) => {
+
+	if (err) {
+		res.status(403).json({ error: "Error occured, cannot proceed", })
+	} else {
+		next() // Pass the request to the next middleware if no CORS error occurred
+	}
+})
 
 const PORT = process.env.PORT || 3000
 

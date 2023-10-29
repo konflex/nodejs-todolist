@@ -100,7 +100,7 @@ exports.signup = async (req, res) => {
 
 		// Create an encoded token for JWT
 		const encodedToken = jwt.sign({
-			email: user.email,				
+			email: user.email,
 			token: token,
 		},
 			process.env.SECRET_KEY
@@ -304,7 +304,7 @@ exports.signin = async (req, res) => {
 		const accessToken = jwt.sign(
 		{
 			id: user.id,
-			exp: Math.floor(Date.now() / 1000) + parseInt(process.env.TOKEN_EXPIRATION),
+			exp: Math.floor(Date.now() / 1000) + parseInt(process.env.TOKEN_EXPIRATION), // Token expiration in seconds
 		},
 		process.env.SECRET_KEY
 		)
@@ -359,7 +359,6 @@ exports.signin = async (req, res) => {
  * @param {Object} res - The Express.js response object.
  * @returns {void}
  */
-//TODO: to check if token is well renew
 exports.refreshToken = async (req, res) => {
 
 	try {
@@ -450,7 +449,6 @@ exports.refreshToken = async (req, res) => {
  * @param {Object} req - Express request object containing user's email.
  * @param {Object} res - Express response object to send HTTP response.
  */
-// TODO: to test
 exports.sendResetPasswordLink = async (req, res) => {
 
 	try {
@@ -470,7 +468,6 @@ exports.sendResetPasswordLink = async (req, res) => {
 		const encodedToken = jwt.sign({
 			email: user.email,
 			token: token,
-			// TODO: Add expiration date if needed
 		}, process.env.SECRET_KEY)
 	
 		// Create a PasswordToken model and save it to the database
@@ -516,7 +513,6 @@ exports.sendResetPasswordLink = async (req, res) => {
  * @param {Object} req - Express request object containing token and new password.
  * @param {Object} res - Express response object to send HTTP response.
  */
-// TODO: test it
 exports.resetPassword = async (req, res) => {
 	try {
 		// Get the token from request parameters

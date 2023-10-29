@@ -6,94 +6,126 @@
 
 const db = require("../models")
 const Task = db.task
-
 require('dotenv').config()
 
-exports.postTask = (req, res) => {
-
-	const task = new Task({
-		task: req.body.task,
-		email: req.body.email,
-		achievement: req.body.achievement
-	})
-
-	task.save((err, task) => {
-		if(err) {
-			res.status(500).json({ message: err })
-			return
-		}
-
-		res.status(200).json({ message: "Task was recorded successfully"})
-		return
-	})
-}
-
-exports.allTasks = (req, res) => {
-
-	Task.find({
-		email: req.query.email
-	})
-		.exec((err, tasks) => {
-			if(err) {
-				res.status(500).json({ message: err })
-				return
-			}
-
-			if(!tasks){
-				res.status(200).json([])
-				return 
-			} 
-
-			res.status(200).json(tasks)
-			return
+/**
+ * Save a user's task to the database.
+ *
+ * @param {Request} req - The Express request object.
+ * @param {Response} res - The Express response object.
+ */
+exports.postTask = async (req, res) => {
+	try {
+		// Create a task model 
+		const task = new Task({
+			task: req.body.task,
+			email: req.body.email,
+			achievement: req.body.achievement
 		})
+
+		// Save task
+		await task.save()
+		res.status(200).json({})
+		return
+	}
+	catch(err) {
+		res.status(500).json({ message: "Error occurred, cannot proceed", })
+		return
+	}
 }
 
-exports.deleteManyTasks = (req, res) => {
+/**
+ * Retrieve all tasks for a specific user based on their email.
+ *
+ * @param {Request} req - The Express request object.
+ * @param {Response} res - The Express response object.
+ */
+exports.allTasks = async (req, res) => {
+	try {
+		// Retrieve tasks from the database for the specified email
+		const tasks = await Task.find({ email: req.query.email })
 
-	Task.deleteMany(req.body.filter).exec()
+		// If no tasks were found, respond with an empty array
+		if (!tasks) {
+			res.status(200).json([])
+			return
+		}
 
-	res.status(200).json({ 
-		message: "All todos deleted successfully", 
-	})
-	return
+		// Respond with the retrieved tasks
+		res.status(200).json(tasks)
+		return
+	}
+	catch (err) {
+		// Handle any errors that occur during the database query
+		res.status(500).json({ message: "Error occurred, cannot proceed" })
+		return
+	}
 }
 
-exports.deleteTask = (req, res) => {
-
-	Task.findOneAndRemove({
-		_id: req.body.id
-	}, function(err, task) {
-		if(!err && task) {
-			res.status(200).json({message: "Task successfully deleted" })
-			return 
-		}
-		else {
-			res.status(500).json({ message: err })
-			return
-		}
-	})
-
+/**
+ * Delete multiple tasks based on a filter.
+ *
+ * @param {Request} req - The Express request object.
+ * @param {Response} res - The Express response object.
+*/
+exports.deleteManyTasks = async (req, res) => {
+	try {
+		await Task.deleteMany(req.body.filter)
+		res.status(200).json({})
+		return
+	}
+	catch (err) {
+		res.status(500).json({ message: "Error occurred, cannot proceed", })
+		return
+	}
 }
 
-exports.updateTask = (req, res) => {
+/**
+ * Delete a specific task based on its ID.
+ *
+ * @param {Request} req - The Express request object.
+ * @param {Response} res - The Express response object.
+*/
+exports.deleteTask = async (req, res) => {
+	try {
+		const task = await Task.findOneAndRemove({ _id: req.body.id })
+		if (task) {
+			res.status(200).json({})
+			return
+		} else {
+			res.status(200).json({})
+			return
+		}
+	}
+	catch (err) {
+		res.status(500).json({ message: "Error occurred, cannot proceed", })
+		return
+	}
+}
 
-	Task.findOneAndUpdate({
-		_id: req.body.id
-	}, { 
-		task: req.body.task,
-		achievement: req.body.achievement }, { new: true }, function(err, task){
-		if(err) {
-			res.status(500).json({ message: err })
+/**
+ * Update a specific task based on its ID.
+ *
+ * @param {Request} req - The Express request object.
+ * @param {Response} res - The Express response object.
+*/
+exports.updateTask = async (req, res) => {
+	try {
+		const task = await Task.findOneAndUpdate(
+			{ _id: req.body.id },
+			{ task: req.body.task, achievement: req.body.achievement },
+			{ new: true }
+		)
+
+		if (task) {
+			res.status(200).json({})
+			return
+		} else {
+			res.status(200).json({})
 			return
 		}
-		else if(!err && !task) {
-			res.status(200).json({ message: "No task was found"})
-			return
-		}
-		else {
-			res.status(200).json({ message: "Task successfully updated"})
-			return
-		}
-	})
+	} catch (err) {
+		res.status(500).json({ message: "Error occurred, cannot proceed", })
+		return
+	}
 }

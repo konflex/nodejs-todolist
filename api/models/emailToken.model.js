@@ -6,7 +6,7 @@
 
 const mongoose = require("mongoose")
 
-const tenMinutes = 60 * 60
+const tenMinutes = 10 * 60
 
 // Mongoose schema
 const emailTokenSchema = new mongoose.Schema({
